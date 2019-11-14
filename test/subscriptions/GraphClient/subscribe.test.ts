@@ -135,6 +135,68 @@ describe('GraphClient.subscribe()', () => {
     sinon.restore();
   });
 
+
+  it('should not call fetcher when blank transactions are recieved', async () => {
+    const mockQuerySubscriber = {
+      subscribe: (fakeObserver: Observer<any>) => {
+        if (fakeObserver.next) fakeObserver.next({ data: { stakeRequesteds: [] } });
+        return sinon.fake();
+      },
+    };
+    const mockApolloClientWithFakeSubscriber = sinon.createStubInstance(ApolloClient);
+    const spyMethod = sinon.replace(
+      mockApolloClientWithFakeSubscriber,
+      'subscribe',
+      sinon.fake.returns(mockQuerySubscriber) as any,
+    );
+    graphClient = new GraphClient(mockApolloClientWithFakeSubscriber as any);
+    const handler = sinon.createStubInstance(TransactionHandler);
+    const fetcher = sinon.createStubInstance(TransactionFetcher);
+    const fetcherSpy = sinon.replace(
+      fetcher,
+      'fetch',
+      sinon.fake.resolves(transactions) as any,
+    );
+    const contractEntityRepository = sinon.createStubInstance(ContractEntityRepository);
+
+    const querySubscriber = await graphClient.subscribe(
+      subscriptionQry,
+      handler as any,
+      fetcher as any,
+      contractEntityRepository as any,
+    );
+
+    assert(
+      querySubscriber,
+      'Invalid query subscription object.',
+    );
+
+    SpyAssert.assert(
+      spyMethod,
+      1,
+      [[options]],
+    );
+
+    SpyAssert.assert(
+      fetcherSpy,
+      0,
+      [],
+    );
+
+    SpyAssert.assert(
+      handler.handle,
+      0,
+      [],
+    );
+
+    SpyAssert.assert(
+      contractEntityRepository.save,
+      0,
+      [],
+    );
+    sinon.restore();
+  });
+
   it('should throw an error when subscriptionQry is undefined object', async () => {
     const handler = sinon.mock(TransactionHandler);
     const fetcher = sinon.mock(TransactionFetcher);
